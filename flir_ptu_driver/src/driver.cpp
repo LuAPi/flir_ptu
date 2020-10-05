@@ -77,9 +77,24 @@ bool PTU::disableLimits()
 
 bool PTU::initialize()
 {
+  // Clear out any data from the PTU serial buffer before attempting to send any commands.
+  std::string out = "blank";
+  while (out != "")
+  {
+    ROS_ERROR("Clearing PTU buffer...");
+    out = ser_->read(500);
+  }
+  ros::Duration(0.5).sleep();
+
+
+
+
+
+  ser_->write("a "); // await
   ser_->write("ft ");  // terse feedback
   ser_->write("ed ");  // disable echo
   ser_->write("ci ");  // position mode
+  ser_->write("cme "); // enable D series compatability mode
   ser_->read(20);
 
   // get pan tilt encoder res
@@ -113,6 +128,11 @@ std::string PTU::sendCommand(std::string command)
   ser_->write(command);
   ROS_DEBUG_STREAM("TX: " << command);
   std::string buffer = ser_->readline(PTU_BUFFER_LEN);
+  while(ser_->available() > 0)
+  {
+    ROS_DEBUG_STREAM("RX (disarded): " << buffer);
+    buffer = ser_->readline(PTU_BUFFER_LEN);
+  }
   ROS_DEBUG_STREAM("RX: " << buffer);
   return buffer;
 }
