@@ -159,7 +159,7 @@ void Node::connect()
   }
   catch (serial::IOException& e)
   {
-    ROS_ERROR_STREAM("Unable to open connection " << ss);
+    ROS_ERROR_STREAM("Unable to open connection " << ss.str());
     return;
   }
 
@@ -167,7 +167,7 @@ void Node::connect()
 
   if (!m_pantilt->initialize())
   {
-    ROS_ERROR_STREAM("Could not initialize FLIR PTU on " << ss);
+    ROS_ERROR_STREAM("Could not initialize FLIR PTU on " << ss.str());
     disconnect();
     return;
   }
