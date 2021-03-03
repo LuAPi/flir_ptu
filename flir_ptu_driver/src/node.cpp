@@ -123,13 +123,13 @@ void Node::connect()
   ros::param::param<bool>("~limits_enabled", limit, true);
   ros::param::param<int32_t>("~baud", baud, PTU_DEFAULT_BAUD);
   ros::param::param<double>("~default_velocity", default_velocity_, PTU_DEFAULT_VEL);
-  ros::param::param<std::string>("/ptu/ptu_driver/connection_type", connection_type_string, "tty");
+  ros::param::param<std::string>("~connection_type", connection_type_string, "tty");
 
   if (!strcmp("tcp", connection_type_string.c_str())) {
 	  m_connection_type = tcp;
 
-	  ros::param::param<std::string>("/ptu/ptu_driver/ip_addr", ip_addr, "192.168.0.25");
-	  ros::param::param<int32_t>("/ptu/ptu_driver/tcp_port", tcp_port, 4000);
+	  ros::param::param<std::string>("~ip_addr", ip_addr, "192.168.0.25");
+	  ros::param::param<int32_t>("~tcp_port", tcp_port, 4000);
 	  ss << connection_type_string << ":" << ip_addr << ":" << tcp_port;
   }
   else if (!strcmp("tty", connection_type_string.c_str())) {
