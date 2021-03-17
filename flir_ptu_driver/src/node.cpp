@@ -40,6 +40,8 @@
 namespace flir_ptu_driver
 {
 
+  const int kMAX_RETRIES = 3;
+
 class Node
 {
 public:
@@ -249,17 +251,37 @@ void Node::cmdCallback(const sensor_msgs::JointState::ConstPtr& msg)
     panspeed = default_velocity_;
     tiltspeed = default_velocity_;
   }
-
-  m_pantilt->setPosition(PTU_PAN, pan);
-  m_pantilt->setPosition(PTU_TILT, tilt);
-  m_pantilt->setSpeed(PTU_PAN, panspeed);
-  m_pantilt->setSpeed(PTU_TILT, tiltspeed);
+  for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
+    try{
+      m_pantilt->setPosition(PTU_PAN, pan);
+      m_pantilt->setPosition(PTU_TILT, tilt);
+      m_pantilt->setSpeed(PTU_PAN, panspeed);
+      m_pantilt->setSpeed(PTU_TILT, tiltspeed);
+      break;
+    } catch(exceptions::FlirPtuClientException)){
+      if(retry < kMAX_RETRIES){
+        connect();
+      } else{
+        throw;
+      }
+    }
+  }
 }
 
 void Node::produce_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat)
 {
   stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "All normal.");
-  stat.add("PTU Mode", m_pantilt->getMode() == PTU_POSITION ? "Position" : "Velocity");
+  for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
+    try{
+      stat.add("PTU Mode", m_pantilt->getMode() == PTU_POSITION ? "Position" : "Velocity");
+    } catch(exceptions::FlirPtuClientException)){
+      if(retry < kMAX_RETRIES){
+        connect();
+      } else{
+        throw;
+      }
+    }
+  }
 }
 
 void Node::testPanTilt(void)
@@ -294,12 +316,27 @@ void Node::spinCallback(const ros::TimerEvent&)
 {
   if (!ok()) return;
 
-  // Read Position & Speed
-  double pan  = m_pantilt->getPosition(PTU_PAN);
-  double tilt = m_pantilt->getPosition(PTU_TILT);
+  double pan;
+  double tilt;
 
-  double panspeed  = m_pantilt->getSpeed(PTU_PAN);
-  double tiltspeed = m_pantilt->getSpeed(PTU_TILT);
+  double panspeed;
+  double tiltspeed;
+
+  for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
+    try{
+      pan  = m_pantilt->getPosition(PTU_PAN);
+      tilt = m_pantilt->getPosition(PTU_TILT);
+      panspeed  = m_pantilt->getSpeed(PTU_PAN);
+      tiltspeed = m_pantilt->getSpeed(PTU_TILT);
+      break;
+    } catch(exceptions::FlirPtuClientException)){
+      if(retry < kMAX_RETRIES){
+        connect();
+      } else{
+        throw;
+      }
+    }
+  }
 
   // Publish Position & Speed
   sensor_msgs::JointState joint_state;
