@@ -31,6 +31,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <flir_ptu_driver/driver.h>
+#include <flir_ptu_driver/exceptions.h>
 #include <serial/serial.h>
 #include <ros/console.h>
 
@@ -66,6 +67,7 @@ T parseResponse(std::string responseBuffer)
   catch (boost::exception& e)
   {
 	ROS_ERROR_STREAM("Unable to parse " << responseBuffer);
+  BOOST_THROW_EXCEPTION(exceptions::ResponseParsingException())
   }
 
   return parsed;
@@ -281,14 +283,16 @@ bool PTU::home()
 // get radians/count resolution
 float PTU::getRes(char type)
 {
-  if (! connected_ == true)return -1;
+  if (! connected_ == true){
+    BOOST_THROW_EXCEPTION(exceptions::NotConnectedException());
+  };
 
   std::string buffer = sendCommand(std::string() + type + "r ");
 
   if (buffer.length() < 3 || buffer[0] != '*')
   {
     ROS_ERROR_THROTTLE(30, "Error getting pan-tilt res");
-    return -1;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
   }
 
   double z = parseResponse<double>(buffer);
@@ -299,14 +303,17 @@ float PTU::getRes(char type)
 // get position limit
 int PTU::getLimit(char type, char limType)
 {
-  if (! connected_ == true)return -1;
+  if (! connected_ == true){
+    BOOST_THROW_EXCEPTION(exceptions::NotConnectedException());
+  };
 
   std::string buffer = sendCommand(std::string() + type + limType + " ");
 
   if (buffer.length() < 3 || buffer[0] != '*')
   {
     ROS_ERROR_THROTTLE(30, "Error getting pan-tilt limit");
-    return -1;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
+
   }
 
   return parseResponse<int>(buffer);
@@ -316,14 +323,16 @@ int PTU::getLimit(char type, char limType)
 // get position in radians
 float PTU::getPosition(char type)
 {
-  if (!initialized()) return -1;
+  if (!initialized()){
+    BOOST_THROW_EXCEPTION(exceptions::NotInitializedException());
+  };
 
   std::string buffer = sendCommand(std::string() + type + "p ");
 
   if (buffer.length() < 3 || buffer[0] != '*')
   {
     ROS_ERROR_THROTTLE(30, "Error getting pan-tilt pos");
-    return -1;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
   }
 
   return parseResponse<double>(buffer) * getResolution(type);
@@ -333,7 +342,9 @@ float PTU::getPosition(char type)
 // set position in radians
 bool PTU::setPosition(char type, float pos, bool block)
 {
-  if (!initialized()) return false;
+  if (!initialized()){
+    BOOST_THROW_EXCEPTION(exceptions::NotInitializedException());
+  };
 
   // get raw encoder count to move
   int count = static_cast<int>(pos / getResolution(type));
@@ -345,7 +356,7 @@ bool PTU::setPosition(char type, float pos, bool block)
     {
       ROS_ERROR_THROTTLE(30, "Pan Tilt Value out of Range: %c %f(%d) (%d-%d)\n",
                 type, pos, count, (type == PTU_TILT ? TMin : PMin), (type == PTU_TILT ? TMax : PMax));
-      return false;
+      BOOST_THROW_EXCEPTION(exceptions::ValueOutOfRangeException());
     }
   }
 
@@ -355,7 +366,7 @@ bool PTU::setPosition(char type, float pos, bool block)
   if (buffer.empty() || buffer[0] != '*')
   {
     ROS_ERROR("Error setting pan-tilt pos");
-    return false;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
   }
 
   if (block)
@@ -372,14 +383,16 @@ bool PTU::setPosition(char type, float pos, bool block)
 // get speed in radians/sec
 float PTU::getSpeed(char type)
 {
-  if (!initialized()) return -1;
+  if (!initialized()){
+    BOOST_THROW_EXCEPTION(exceptions::NotInitializedException());
+  };
 
   std::string buffer = sendCommand(std::string() + type + "s ");
 
   if (buffer.length() < 3 || buffer[0] != '*')
   {
     ROS_ERROR("Error getting pan-tilt speed");
-    return -1;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
   }
 
   return parseResponse<double>(buffer) * getResolution(type);
@@ -390,7 +403,9 @@ float PTU::getSpeed(char type)
 // set speed in radians/sec
 bool PTU::setSpeed(char type, float pos)
 {
-  if (!initialized()) return false;
+  if (!initialized()){
+    BOOST_THROW_EXCEPTION(exceptions::NotInitializedException());
+  };
 
   // get raw encoder speed to move
   int count = static_cast<int>(pos / getResolution(type));
@@ -400,7 +415,7 @@ bool PTU::setSpeed(char type, float pos)
   {
     ROS_ERROR("Pan Tilt Speed Value out of Range: %c %f(%d) (%d-%d)\n",
               type, pos, count, (type == PTU_TILT ? TSMin : PSMin), (type == PTU_TILT ? TSMax : PSMax));
-    return false;
+    BOOST_THROW_EXCEPTION(exceptions::ValueOutOfRangeException());
   }
 
   std::string buffer = sendCommand(std::string() + type + "s" +
@@ -409,7 +424,7 @@ bool PTU::setSpeed(char type, float pos)
   if (buffer.empty() || buffer[0] != '*')
   {
     ROS_ERROR("Error setting pan-tilt speed\n");
-    return false;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
   }
 
   return true;
@@ -419,14 +434,16 @@ bool PTU::setSpeed(char type, float pos)
 // set movement mode (position/velocity)
 bool PTU::setMode(char type)
 {
-  if (!initialized()) return false;
+  if (!initialized()){
+    BOOST_THROW_EXCEPTION(exceptions::NotInitializedException());
+  };
 
   std::string buffer = sendCommand(std::string("c") + type + " ");
 
   if (buffer.empty() || buffer[0] != '*')
   {
     ROS_ERROR("Error setting pan-tilt move mode");
-    return false;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
   }
 
   return true;
@@ -435,7 +452,9 @@ bool PTU::setMode(char type)
 // get ptu mode
 char PTU::getMode()
 {
-  if (!initialized()) return -1;
+  if (!initialized()){
+    BOOST_THROW_EXCEPTION(exceptions::NotInitializedException());
+  };
 
   // get pan tilt mode
   std::string buffer = sendCommand("c ");
@@ -443,7 +462,7 @@ char PTU::getMode()
   if (buffer.length() < 3 || buffer[0] != '*')
   {
     ROS_ERROR("Error getting pan-tilt pos");
-    return -1;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
   }
 
   if (buffer[2] == 'p' || buffer[2] == 'P')
@@ -451,7 +470,7 @@ char PTU::getMode()
   else if (buffer[2] == 'i' || buffer[2] == 'I')
     return PTU_POSITION;
   else
-    return -1;
+    BOOST_THROW_EXCEPTION(exceptions::IncorrectResponseException());
 }
 
 }  // namespace flir_ptu_driver
