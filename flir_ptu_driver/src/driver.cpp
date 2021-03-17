@@ -446,9 +446,9 @@ char PTU::getMode()
     return -1;
   }
 
-  if (buffer[2] == 'p')
+  if (buffer[2] == 'p' || buffer[2] == 'P')
     return PTU_VELOCITY;
-  else if (buffer[2] == 'i')
+  else if (buffer[2] == 'i' || buffer[2] == 'I')
     return PTU_POSITION;
   else
     return -1;
