@@ -67,7 +67,7 @@ T parseResponse(std::string responseBuffer)
   catch (boost::exception& e)
   {
 	ROS_ERROR_STREAM("Unable to parse " << responseBuffer);
-  BOOST_THROW_EXCEPTION(exceptions::ResponseParsingException())
+  BOOST_THROW_EXCEPTION(exceptions::ResponseParsingException());
   }
 
   return parsed;

@@ -30,6 +30,7 @@
 
 #include <diagnostic_updater/diagnostic_updater.h>
 #include <diagnostic_updater/publisher.h>
+#include <flir_ptu_driver/exceptions.h>
 #include <flir_ptu_driver/driver.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
@@ -258,7 +259,7 @@ void Node::cmdCallback(const sensor_msgs::JointState::ConstPtr& msg)
       m_pantilt->setSpeed(PTU_PAN, panspeed);
       m_pantilt->setSpeed(PTU_TILT, tiltspeed);
       break;
-    } catch(exceptions::FlirPtuClientException)){
+    } catch(exceptions::FlirPtuClientException){
       if(retry < kMAX_RETRIES){
         connect();
       } else{
@@ -274,7 +275,7 @@ void Node::produce_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat
   for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
     try{
       stat.add("PTU Mode", m_pantilt->getMode() == PTU_POSITION ? "Position" : "Velocity");
-    } catch(exceptions::FlirPtuClientException)){
+    } catch(exceptions::FlirPtuClientException){
       if(retry < kMAX_RETRIES){
         connect();
       } else{
@@ -329,7 +330,7 @@ void Node::spinCallback(const ros::TimerEvent&)
       panspeed  = m_pantilt->getSpeed(PTU_PAN);
       tiltspeed = m_pantilt->getSpeed(PTU_TILT);
       break;
-    } catch(exceptions::FlirPtuClientException)){
+    } catch(exceptions::FlirPtuClientException){
       if(retry < kMAX_RETRIES){
         connect();
       } else{
