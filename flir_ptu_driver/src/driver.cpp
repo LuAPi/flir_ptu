@@ -408,18 +408,20 @@ bool PTU::setSpeed(char type, float pos)
   };
 
   // get raw encoder speed to move
-  int count = static_cast<int>(pos / getResolution(type));
-
+  float resolution(getResolution(type));
+  int count = abs(static_cast<int>(pos / resolution));
+  int clipped_count(std::max((type == PTU_TILT ? TSMin : PSMin),
+                    std::min((type == PTU_TILT ? TSMax : PSMax), count)));
   // Check limits
-  if (abs(count) < (type == PTU_TILT ? TSMin : PSMin) || abs(count) > (type == PTU_TILT ? TSMax : PSMax))
+  if (count < (type == PTU_TILT ? TSMin : PSMin) || count > (type == PTU_TILT ? TSMax : PSMax))
   {
-    ROS_ERROR("Pan Tilt Speed Value out of Range: %c %f(%d) (%d-%d)\n",
-              type, pos, count, (type == PTU_TILT ? TSMin : PSMin), (type == PTU_TILT ? TSMax : PSMax));
-    BOOST_THROW_EXCEPTION(exceptions::ValueOutOfRangeException());
+    float clipped_speed(clipped_count * resolution);
+    ROS_WARN("Pan Tilt Speed Value out of Range: %c %f(%d) (%d-%d). Clipping to %f (%d)\n",
+              type, pos, count, (type == PTU_TILT ? TSMin : PSMin), (type == PTU_TILT ? TSMax : PSMax), clipped_speed, clipped_count);
   }
 
   std::string buffer = sendCommand(std::string() + type + "s" +
-                                   lexical_cast<std::string>(count) + " ");
+                                   lexical_cast<std::string>(clipped_count) + " ");
 
   if (buffer.empty() || buffer[0] != '*')
   {
