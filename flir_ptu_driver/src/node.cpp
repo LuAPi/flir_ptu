@@ -35,6 +35,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Bool.h>
+#include <ros/console.h>
 
 #include <string>
 #include <mutex>
@@ -382,6 +383,7 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "ptu");
   ros::NodeHandle n;
+  ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
 
   while (ros::ok())
   {
