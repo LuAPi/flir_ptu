@@ -37,6 +37,7 @@
 #include <std_msgs/Bool.h>
 
 #include <string>
+#include <mutex>
 
 namespace flir_ptu_driver
 {
@@ -80,6 +81,8 @@ protected:
   
   private:
   bool m_test_mode; // if true send pan and tilt commands periodically
+  std::mutex comms_mutex_;
+  void connect_internal();
   void testPanTilt(void);
 };
 
@@ -98,13 +101,20 @@ Node::Node(ros::NodeHandle& node_handle)
 
 Node::~Node()
 {
+  std::lock_guard<std::mutex> lock(comms_mutex_);
   disconnect();
   delete m_updater;
 }
 
+void Node::connect()
+{
+  std::lock_guard<std::mutex> lock(comms_mutex_);
+  connect_internal();
+}
+
 /** Opens the connection to the PTU and sets appropriate parameters.
     Also manages subscriptions/publishers */
-void Node::connect()
+void Node::connect_internal()
 {
   // If we are reconnecting, first make sure to disconnect
   if (ok())
@@ -153,12 +163,12 @@ void Node::connect()
 
   try
   {
-	  if (m_connection_type == tty) {
-		  m_pantilt->connectTTY(port, baud);
-	  }
-	  else if (m_connection_type == tcp) {
-		  m_pantilt->connectTCP(ip_addr, tcp_port);
-	  }
+    if (m_connection_type == tty) {
+      m_pantilt->connectTTY(port, baud);
+    }
+    else if (m_connection_type == tcp) {
+      m_pantilt->connectTCP(ip_addr, tcp_port);
+    }
   }
   catch (serial::IOException& e)
   {
@@ -221,6 +231,7 @@ void Node::disconnect()
 void Node::resetCallback(const std_msgs::Bool::ConstPtr& msg)
 {
   ROS_INFO("Resetting the PTU");
+  std::lock_guard<std::mutex> lock(comms_mutex_);
   m_pantilt->home();
 }
 
@@ -252,6 +263,7 @@ void Node::cmdCallback(const sensor_msgs::JointState::ConstPtr& msg)
     panspeed = default_velocity_;
     tiltspeed = default_velocity_;
   }
+  std::lock_guard<std::mutex> lock(comms_mutex_);
   for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
     try{
       m_pantilt->setPosition(PTU_PAN, pan);
@@ -261,7 +273,7 @@ void Node::cmdCallback(const sensor_msgs::JointState::ConstPtr& msg)
       break;
     } catch(exceptions::FlirPtuClientException){
       if(retry < kMAX_RETRIES){
-        connect();
+        connect_internal();
       } else{
         throw;
       }
@@ -272,14 +284,17 @@ void Node::cmdCallback(const sensor_msgs::JointState::ConstPtr& msg)
 void Node::produce_diagnostics(diagnostic_updater::DiagnosticStatusWrapper &stat)
 {
   stat.summary(diagnostic_msgs::DiagnosticStatus::OK, "All normal.");
-  for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
-    try{
-      stat.add("PTU Mode", m_pantilt->getMode() == PTU_POSITION ? "Position" : "Velocity");
-    } catch(exceptions::FlirPtuClientException){
-      if(retry < kMAX_RETRIES){
-        connect();
-      } else{
-        throw;
+  std::lock_guard<std::mutex> lock(comms_mutex_);
+  if(bool(m_pantilt)){
+    for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
+      try{
+        stat.add("PTU Mode", m_pantilt->getMode() == PTU_POSITION ? "Position" : "Velocity");
+      } catch(exceptions::FlirPtuClientException){
+        if(retry < kMAX_RETRIES){
+          connect_internal();
+        } else{
+          throw;
+        }
       }
     }
   }
@@ -292,6 +307,7 @@ void Node::testPanTilt(void)
   float radian;
   int count;
   char pt;
+  std::lock_guard<std::mutex> lock(comms_mutex_);
   if((++loopCnt % 200) == 75) {
     pt = 'p';
     radian = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) / 2.0;
@@ -322,19 +338,21 @@ void Node::spinCallback(const ros::TimerEvent&)
 
   double panspeed;
   double tiltspeed;
-
-  for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
-    try{
-      pan  = m_pantilt->getPosition(PTU_PAN);
-      tilt = m_pantilt->getPosition(PTU_TILT);
-      panspeed  = m_pantilt->getSpeed(PTU_PAN);
-      tiltspeed = m_pantilt->getSpeed(PTU_TILT);
-      break;
-    } catch(exceptions::FlirPtuClientException){
-      if(retry < kMAX_RETRIES){
-        connect();
-      } else{
-        throw;
+  {
+    std::lock_guard<std::mutex> lock(comms_mutex_);
+    for(int retry = 0; retry <= kMAX_RETRIES; ++retry){
+      try{
+        pan  = m_pantilt->getPosition(PTU_PAN);
+        tilt = m_pantilt->getPosition(PTU_TILT);
+        panspeed  = m_pantilt->getSpeed(PTU_PAN);
+        tiltspeed = m_pantilt->getSpeed(PTU_TILT);
+        break;
+      } catch(exceptions::FlirPtuClientException){
+        if(retry < kMAX_RETRIES){
+          connect_internal();
+        } else{
+          throw;
+        }
       }
     }
   }
